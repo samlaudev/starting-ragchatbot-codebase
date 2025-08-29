@@ -1,8 +1,8 @@
-import anthropic
+import zhipuai
 from typing import List, Optional, Dict, Any
 
 class AIGenerator:
-    """Handles interactions with Anthropic's Claude API for generating responses"""
+    """Handles interactions with Zhipu AI's GLM-4.5 API for generating responses"""
     
     # Static system prompt to avoid rebuilding on each call
     SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to a comprehensive search tool for course information.
@@ -30,7 +30,7 @@ Provide only the direct answer to what was asked.
 """
     
     def __init__(self, api_key: str, model: str):
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self.client = zhipuai.ZhipuAI(api_key=api_key)
         self.model = model
         
         # Pre-build base API parameters
@@ -74,17 +74,17 @@ Provide only the direct answer to what was asked.
         # Add tools if available
         if tools:
             api_params["tools"] = tools
-            api_params["tool_choice"] = {"type": "auto"}
+            api_params["tool_choice"] = "auto"
         
-        # Get response from Claude
-        response = self.client.messages.create(**api_params)
+        # Get response from GLM-4.5
+        response = self.client.chat.completions.create(**api_params)
         
         # Handle tool execution if needed
-        if response.stop_reason == "tool_use" and tool_manager:
+        if response.choices[0].finish_reason == "tool_calls" and tool_manager:
             return self._handle_tool_execution(response, api_params, tool_manager)
         
         # Return direct response
-        return response.content[0].text
+        return response.choices[0].message.content
     
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
         """
@@ -102,26 +102,29 @@ Provide only the direct answer to what was asked.
         messages = base_params["messages"].copy()
         
         # Add AI's tool use response
-        messages.append({"role": "assistant", "content": initial_response.content})
+        assistant_message = {
+            "role": "assistant", 
+            "content": initial_response.choices[0].message.content,
+            "tool_calls": initial_response.choices[0].message.tool_calls
+        }
+        messages.append(assistant_message)
         
         # Execute all tool calls and collect results
         tool_results = []
-        for content_block in initial_response.content:
-            if content_block.type == "tool_use":
-                tool_result = tool_manager.execute_tool(
-                    content_block.name, 
-                    **content_block.input
-                )
-                
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": content_block.id,
-                    "content": tool_result
-                })
+        for tool_call in initial_response.choices[0].message.tool_calls:
+            tool_result = tool_manager.execute_tool(
+                tool_call.function.name,
+                **eval(tool_call.function.arguments)
+            )
+            
+            tool_results.append({
+                "tool_call_id": tool_call.id,
+                "role": "tool",
+                "content": tool_result
+            })
         
-        # Add tool results as single message
-        if tool_results:
-            messages.append({"role": "user", "content": tool_results})
+        # Add tool results to messages
+        messages.extend(tool_results)
         
         # Prepare final API call without tools
         final_params = {
@@ -131,5 +134,5 @@ Provide only the direct answer to what was asked.
         }
         
         # Get final response
-        final_response = self.client.messages.create(**final_params)
-        return final_response.content[0].text
+        final_response = self.client.chat.completions.create(**final_params)
+        return final_response.choices[0].message.content
