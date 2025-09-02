@@ -1,4 +1,4 @@
-import zhipuai
+from zai import ZhipuAiClient
 from typing import List, Optional, Dict, Any
 
 class AIGenerator:
@@ -30,7 +30,7 @@ Provide only the direct answer to what was asked.
 """
     
     def __init__(self, api_key: str, model: str):
-        self.client = zhipuai.ZhipuAI(api_key=api_key)
+        self.client = ZhipuAiClient(api_key=api_key)
         self.model = model
         
         # Pre-build base API parameters
@@ -64,11 +64,16 @@ Provide only the direct answer to what was asked.
             else self.SYSTEM_PROMPT
         )
         
+        # 修复：将system消息作为messages数组的第一个元素
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": query}
+        ]
+        
         # Prepare API call parameters efficiently
         api_params = {
             **self.base_params,
-            "messages": [{"role": "user", "content": query}],
-            "system": system_content
+            "messages": messages  # 移除单独的system参数
         }
         
         # Add tools if available
@@ -129,8 +134,7 @@ Provide only the direct answer to what was asked.
         # Prepare final API call without tools
         final_params = {
             **self.base_params,
-            "messages": messages,
-            "system": base_params["system"]
+            "messages": messages  # 移除system参数，直接使用messages
         }
         
         # Get final response

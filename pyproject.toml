@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "chromadb==1.0.15",
-    "zhipuai>=2.0.0",
+    "zai-sdk>=0.0.3.3", # 修复：从 zhipuai 改为 zai-sdk
     "sentence-transformers==5.0.0",
     "fastapi==0.116.1",
     "uvicorn==0.35.0",

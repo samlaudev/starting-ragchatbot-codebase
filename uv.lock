@@ -1513,7 +1513,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "sentence-transformers" },
     { name = "uvicorn" },
-    { name = "zhipuai" },
+    { name = "zai-sdk" },
 ]
 
 [package.metadata]
@@ -1524,7 +1524,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.20" },
     { name = "sentence-transformers", specifier = "==5.0.0" },
     { name = "uvicorn", specifier = "==0.35.0" },
-    { name = "zhipuai", specifier = ">=2.0.0" },
+    { name = "zai-sdk", specifier = ">=0.0.3.3" },
 ]
 
 [[package]]
@@ -1833,8 +1833,8 @@ wheels = [
 ]
 
 [[package]]
-name = "zhipuai"
-version = "2.1.5.20250825"
+name = "zai-sdk"
+version = "0.0.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -1843,9 +1843,9 @@ dependencies = [
     { name = "pydantic-core" },
     { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/9b/972de785a9859bbb5ee6425e011f154001886207860acdedebd174b7f2c2/zhipuai-2.1.5.20250825.tar.gz", hash = "sha256:50fc3982565ee631bd640b1166a1d223de227958026a74a1dd0e26dbd58d729c", size = 69899, upload-time = "2025-08-25T10:58:52.796Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c1/ef/eb110f8e7a7b81d4f188a0f2e420d09771b3347a65dc775e80e22db48051/zai_sdk-0.0.3.4.tar.gz", hash = "sha256:c116370bafe29481aebfc0deea454e9a009b21c88c17fb143fdcdf5f4857c303", size = 69962, upload-time = "2025-09-01T08:16:13.528Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/95/22fc274f670e4531da20cc607991c34e7f8f4de5baa589e454e77e2492fa/zhipuai-2.1.5.20250825-py3-none-any.whl", hash = "sha256:aaad19881e514a4682598f07503b82d60b8b9a91cd83f9bcda988b94853c830d", size = 119097, upload-time = "2025-08-25T10:58:51.518Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/8c/1715574027840468859e114fe2c4dc660ae1606f6215595ead802062365f/zai_sdk-0.0.3.4-py3-none-any.whl", hash = "sha256:646f4d1efa81f6d941c09665eb4515cc8db853c66db35ce5416e002e39a61d1b", size = 110506, upload-time = "2025-09-01T08:16:12.335Z" },
 ]
 
 [[package]]

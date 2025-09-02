@@ -10,7 +10,7 @@ class Config:
     """Configuration settings for the RAG system"""
     # Zhipu AI API settings
     ZHIPUAI_API_KEY: str = os.getenv("ZHIPUAI_API_KEY", "")
-    ZHIPUAI_MODEL: str = "glm-4-5"
+    ZHIPUAI_MODEL: str = "glm-4.5"  # 修复：从 glm-4-5 改为 glm-4.5
     
     # Embedding model settings
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
