@@ -122,10 +122,28 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        console.log('Sources received:', sources); // Debug log
+        const formattedSources = sources.map(source => {
+            // Check if source contains invisible link format "Text|||URL"
+            const parts = source.split('|||');
+            console.log('Processing source:', source, 'Parts:', parts); // Debug log
+            if (parts.length === 2 && parts[1].startsWith('http')) {
+                // Create clickable link
+                const linkText = parts[0];
+                const linkUrl = parts[1];
+                console.log('Creating link:', linkText, linkUrl); // Debug log
+                return `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer" class="source-link">${linkText}</a>`;
+            } else {
+                // Regular source text
+                console.log('No link found in source:', source); // Debug log
+                return source;
+            }
+        }).join(' ');
+        
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <div class="sources-content">${formattedSources}</div>
             </details>
         `;
     }
