@@ -35,7 +35,7 @@ class VectorStore:
     """Vector storage using ChromaDB for course content and metadata"""
     
     def __init__(self, chroma_path: str, embedding_model: str, max_results: int = 5):
-        self.max_results = max_results
+        self.max_results = max_results if max_results > 0 else 5  # Ensure positive value
         # Initialize ChromaDB client
         self.client = chromadb.PersistentClient(
             path=chroma_path,
@@ -88,6 +88,8 @@ class VectorStore:
         # Step 3: Search course content
         # Use provided limit or fall back to configured max_results
         search_limit = limit if limit is not None else self.max_results
+        if search_limit <= 0:
+            search_limit = 5  # Ensure we have a reasonable default
         
         try:
             results = self.course_content.query(

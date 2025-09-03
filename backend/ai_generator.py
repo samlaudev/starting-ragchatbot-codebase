@@ -128,9 +128,17 @@ Provide only the direct answer to what was asked.
         # Execute all tool calls and collect results
         tool_results = []
         for tool_call in initial_response.choices[0].message.tool_calls:
+            # Parse tool arguments safely
+            try:
+                import json
+                tool_args = json.loads(tool_call.function.arguments)
+            except (json.JSONDecodeError, TypeError):
+                # Fallback to eval if JSON parsing fails
+                tool_args = eval(tool_call.function.arguments)
+            
             tool_result = tool_manager.execute_tool(
                 tool_call.function.name,
-                **eval(tool_call.function.arguments)
+                **tool_args
             )
             
             tool_results.append({
