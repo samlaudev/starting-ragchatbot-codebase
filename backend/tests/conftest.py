@@ -2,6 +2,8 @@ import os
 import sys
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock
+from fastapi.testclient import TestClient
 
 # Add the backend directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -175,5 +177,123 @@ def populated_vector_store(mock_vector_store, sample_course_data):
     # Add to vector store
     mock_vector_store.add_course_metadata(course)
     mock_vector_store.add_course_content(chunks)
+return mock_vector_store
 
-    return mock_vector_store
+@pytest.fixture
+def test_app():
+    """Create a test FastAPI app without static files"""
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.trustedhost import TrustedHostMiddleware
+    from pydantic import BaseModel
+    from typing import List, Optional
+    
+    # Create test app without static files
+    app = FastAPI(title="Test Course Materials RAG System", root_path="")
+    
+    # Add middleware
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["*"]
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+    
+    # Pydantic models for request/response
+    class QueryRequest(BaseModel):
+        query: str
+        session_id: Optional[str] = None
+
+    class QueryResponse(BaseModel):
+        answer: str
+        sources: List[str]
+        session_id: str
+
+    class CourseStats(BaseModel):
+        total_courses: int
+        course_titles: List[str]
+
+    class ClearSessionRequest(BaseModel):
+        session_id: str
+
+    class ClearSessionResponse(BaseModel):
+        success: bool
+        message: str
+    
+    # Mock RAG system
+    mock_rag = MagicMock()
+    mock_rag.query.return_value = ("Test answer", ["source1", "source2"])
+    mock_rag.get_course_analytics.return_value = {
+        "total_courses": 1,
+        "course_titles": ["Test Course"]
+    }
+    mock_rag.session_manager = MagicMock()
+    mock_rag.session_manager.create_session.return_value = "test_session_id"
+    mock_rag.session_manager.clear_session.return_value = None
+    
+    # Store mock in app state
+    app.state.rag_system = mock_rag
+    
+    # API endpoints
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query_documents(request: QueryRequest):
+        try:
+            session_id = request.session_id
+            if not session_id:
+                session_id = app.state.rag_system.session_manager.create_session()
+            
+            answer, sources = app.state.rag_system.query(request.query, session_id)
+            
+            return QueryResponse(
+                answer=answer,
+                sources=sources,
+                session_id=session_id
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/clear-session", response_model=ClearSessionResponse)
+    async def clear_session(request: ClearSessionRequest):
+        try:
+            app.state.rag_system.session_manager.clear_session(request.session_id)
+            
+            return ClearSessionResponse(
+                success=True,
+                message=f"Session {request.session_id} cleared successfully"
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/courses", response_model=CourseStats)
+    async def get_course_stats():
+        try:
+            analytics = app.state.rag_system.get_course_analytics()
+            return CourseStats(
+                total_courses=analytics["total_courses"],
+                course_titles=analytics["course_titles"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    return app
+
+@pytest.fixture
+def client(test_app):
+    """Create test client for the app"""
+    return TestClient(test_app)
+
+@pytest.fixture
+def sample_query_request():
+    """Sample query request for testing"""
+    return {"query": "What is machine learning?"}
+
+@pytest.fixture
+def sample_clear_session_request():
+    """Sample clear session request for testing"""
+    return {"session_id": "test_session_id"}
