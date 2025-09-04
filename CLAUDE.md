@@ -54,13 +54,43 @@ The system expects structured course documents with specific formatting:
 - **GET /** - Web interface serving static files
 - **WebSocket support** for real-time interactions
 
-## Testing & Development
+## Code Quality & Development
+
+### Code Quality Tools
+The project uses several code quality tools to maintain consistent code style:
+
+- **Black**: Automatic code formatting with 88-character line length
+- **isort**: Import sorting with Black-compatible settings
+- **flake8**: Linting for code quality and style issues
+- **mypy**: Static type checking for better code reliability
+
+### Development Scripts
+- `scripts/quality-check.py`: Run all quality checks (formatting, linting, type checking)
+- `scripts/format-code.py`: Automatically format code with Black and isort
+
+### Running Quality Checks
+```bash
+# Run all quality checks
+python scripts/quality-check.py
+
+# Format code automatically
+python scripts/format-code.py
+
+# Run individual tools
+uv run black --check .
+uv run isort --check-only .
+uv run flake8 .
+uv run mypy .
+```
+
+### Testing & Development
 
 The system includes comprehensive error handling and logging. When making changes:
 - Test document processing with new course materials
 - Verify search functionality through the web interface
 - Check API responses using the interactive docs at `/docs`
 - Monitor ChromaDB storage in `./chroma_db/` directory
+- Run quality checks before committing changes
 
 ## Configuration
 
