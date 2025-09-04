@@ -14,14 +14,47 @@ Available Tools:
 Tool Usage Guidelines:
 - **Use search_course_content** for questions about specific course content, concepts, or detailed educational materials
 - **Use get_course_outline** for questions about course structure, lesson lists, or course overview information
-- **One tool use per query maximum**
+- **Multiple tool use allowed** - Use up to 2 tool calls sequentially for complex queries
+- **Each tool call is a separate interaction** - You can see tool results before deciding on additional calls
+- **Use tools strategically** - Plan your tool usage to gather all necessary information efficiently
 - Synthesize tool results into accurate, fact-based responses
 - If tools yield no results, state this clearly without offering alternatives
 
+Examples of Sequential Tool Usage:
+
+Example 1: Comparing courses
+- User: "Find a course that covers similar topics to lesson 3 of course X"
+- Step 1: Use get_course_outline to find lesson 3 topic
+- Step 2: Use search_course_content to find similar courses
+
+Example 2: Comprehensive analysis
+- User: "What are the prerequisites for course X and what courses build on it?"
+- Step 1: Use get_course_outline for course X structure
+- Step 2: Use search_course_content to find related/prerequisite courses
+
+Example 3: Multi-lesson research
+- User: "Compare the teaching approaches in lesson 5 of course A and lesson 8 of course B"
+- Step 1: Use get_course_outline for course A
+- Step 2: Use get_lesson_content for lesson 5
+- Step 3: Use get_course_outline for course B
+- Step 4: Use get_lesson_content for lesson 8
+
+When to Use Multiple Tools:
+- When you need information from multiple courses or lessons
+- When you need to compare or contrast different materials
+- When the first tool result suggests additional research is needed
+- When answering complex questions that require comprehensive analysis
+
+When to Stop After One Tool:
+- When the single tool result fully answers the question
+- When the question is simple and direct
+- When additional tools would not provide more relevant information
+
 Response Protocol:
 - **General knowledge questions**: Answer using existing knowledge without using tools
-- **Course content questions**: Use search_course_content tool first, then answer
-- **Course outline/structure questions**: Use get_course_outline tool first, then answer
+- **Course content questions**: Use search_course_content tool first, then use additional tools if needed
+- **Course outline/structure questions**: Use get_course_outline tool first, then use additional tools if needed
+- **Complex multi-part questions**: Use multiple tools sequentially to gather comprehensive information
 - **No meta-commentary**:
  - Provide direct answers only — no reasoning process, tool explanations, or question-type analysis
  - Do not mention "based on the search results" or "based on the tool output"
@@ -54,60 +87,240 @@ Provide only the direct answer to what was asked.
     def generate_response(self, query: str,
                          conversation_history: Optional[str] = None,
                          tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+                         tool_manager=None,
+                         max_rounds: int = 2) -> str:
         """
-        Generate AI response with optional tool usage and conversation context.
+        Generate AI response with up to max_rounds sequential tool calls.
         
         Args:
             query: The user's question or request
             conversation_history: Previous messages for context
             tools: Available tools the AI can use
             tool_manager: Manager to execute tools
+            max_rounds: Maximum number of sequential tool rounds (default: 2)
             
         Returns:
             Generated response as string
         """
+        # Build initial messages
+        messages = self._build_initial_messages(query, conversation_history)
         
-        # Build system content efficiently - avoid string ops when possible
+        # Start recursive execution
+        return self._execute_round(messages, tools, tool_manager, 0, max_rounds)
+    
+    def _execute_round(self, messages: List[Dict], 
+                          tools: Optional[List], 
+                          tool_manager, 
+                          round_num: int, 
+                          max_rounds: int) -> str:
+        """
+        Execute one round of conversation recursively.
+        
+        Args:
+            messages: Current message history
+            tools: Tools available for this round
+            tool_manager: Tool manager instance
+            round_num: Current round number
+            max_rounds: Maximum allowed rounds
+            
+        Returns:
+            Final response string
+        """
+        # Build API parameters for this round
+        api_params = self._build_api_params(messages, tools, round_num)
+        
+        # Make API call
+        try:
+            response = self._make_api_call(api_params)
+        except Exception as e:
+            return f"API调用错误: {str(e)}"
+        
+        # Check termination conditions
+        if self._should_terminate(response, round_num, max_rounds, tool_manager):
+            return response.choices[0].message.content
+        
+        # Execute tools and update messages
+        try:
+            updated_messages = self._execute_tools_and_update(response, messages, tool_manager)
+        except Exception as e:
+            return f"工具执行错误: {str(e)}"
+        
+        # Recurse for next round
+        return self._execute_round(updated_messages, None, tool_manager, round_num + 1, max_rounds)
+    
+    def _build_initial_messages(self, query: str, conversation_history: Optional[str] = None) -> List[Dict]:
+        """
+        Build initial message array with system prompt and user query.
+        
+        Args:
+            query: User's query
+            conversation_history: Previous conversation context
+            
+        Returns:
+            List of message dictionaries
+        """
         system_content = (
             f"{self.SYSTEM_PROMPT}\n\nPrevious conversation:\n{conversation_history}"
             if conversation_history 
             else self.SYSTEM_PROMPT
         )
         
-        # 修复：将system消息作为messages数组的第一个元素
-        messages = [
+        return [
             {"role": "system", "content": system_content},
             {"role": "user", "content": query}
         ]
+    
+    def _build_api_params(self, messages: List[Dict], tools: Optional[List], round_num: int) -> Dict:
+        """
+        Build API parameters for the current round.
         
-        # Prepare API call parameters efficiently
+        Args:
+            messages: Message history
+            tools: Available tools
+            round_num: Current round number
+            
+        Returns:
+            API parameters dictionary
+        """
         api_params = {
             **self.base_params,
-            "messages": messages  # 移除单独的system参数
+            "messages": messages
         }
         
-        # Add tools if available
-        if tools:
+        # Only include tools in first round
+        if round_num == 0 and tools:
             api_params["tools"] = tools
             api_params["tool_choice"] = "auto"
         
-        # Get response from GLM-4.5
-        response = self.client.chat.completions.create(**api_params)
+        return api_params
+    
+    def _make_api_call(self, api_params: Dict) -> Any:
+        """
+        Make API call to GLM-4.5.
         
-        # Handle tool execution if needed
-        if response.choices[0].finish_reason == "tool_calls" and tool_manager:
-            return self._handle_tool_execution(response, api_params, tool_manager)
+        Args:
+            api_params: API parameters
+            
+        Returns:
+            API response
+        """
+        return self.client.chat.completions.create(**api_params)
+    
+    def _should_terminate(self, response, round_num: int, max_rounds: int, tool_manager) -> bool:
+        """
+        Check if recursion should terminate.
         
-        # Return direct response
-        return response.choices[0].message.content
+        Args:
+            response: API response
+            round_num: Current round number
+            max_rounds: Maximum allowed rounds
+            tool_manager: Tool manager instance
+            
+        Returns:
+            True if should terminate, False otherwise
+        """
+        # Reached maximum rounds
+        if round_num >= max_rounds:
+            return True
+        
+        # Response has no tool calls
+        if response.choices[0].finish_reason != "tool_calls":
+            return True
+        
+        # No tool manager available
+        if not tool_manager:
+            return True
+        
+        # No tool calls in response
+        if not response.choices[0].message.tool_calls:
+            return True
+        
+        return False
+    
+    def _execute_tools_and_update(self, response, messages: List[Dict], tool_manager) -> List[Dict]:
+        """
+        Execute tool calls and update message history.
+        
+        Args:
+            response: API response with tool calls
+            messages: Current message history
+            tool_manager: Tool manager instance
+            
+        Returns:
+            Updated message history
+        """
+        # Copy messages to avoid modifying original
+        updated_messages = messages.copy()
+        
+        # Add assistant message with tool calls
+        assistant_message = {
+            "role": "assistant",
+            "content": response.choices[0].message.content,
+            "tool_calls": response.choices[0].message.tool_calls
+        }
+        updated_messages.append(assistant_message)
+        
+        # Execute all tool calls
+        for tool_call in response.choices[0].message.tool_calls:
+            tool_result = self._execute_single_tool(tool_call, tool_manager)
+            
+            # Add tool result message
+            updated_messages.append({
+                "tool_call_id": tool_call.id,
+                "role": "tool",
+                "content": tool_result
+            })
+        
+        return updated_messages
+    
+    def _execute_single_tool(self, tool_call, tool_manager) -> str:
+        """
+        Execute a single tool call.
+        
+        Args:
+            tool_call: Tool call object
+            tool_manager: Tool manager instance
+            
+        Returns:
+            Tool execution result
+        """
+        try:
+            # Parse tool arguments
+            tool_args = self._parse_tool_args(tool_call.function.arguments)
+            
+            # Execute tool
+            result = tool_manager.execute_tool(
+                tool_call.function.name,
+                **tool_args
+            )
+            
+            return result
+        except Exception as e:
+            return f"工具执行失败: {tool_call.function.name} - {str(e)}"
+    
+    def _parse_tool_args(self, arguments_str: str) -> Dict:
+        """
+        Parse tool arguments from string.
+        
+        Args:
+            arguments_str: Arguments as JSON string
+            
+        Returns:
+            Parsed arguments dictionary
+        """
+        try:
+            import json
+            return json.loads(arguments_str)
+        except (json.JSONDecodeError, TypeError):
+            # Fallback to eval if JSON parsing fails
+            return eval(arguments_str)
     
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
         """
-        Handle execution of tool calls and get follow-up response.
+        Legacy method for backward compatibility.
         
         Args:
-            initial_response: The response containing tool use requests
+            initial_response: Response containing tool use requests
             base_params: Base API parameters
             tool_manager: Manager to execute tools
             
