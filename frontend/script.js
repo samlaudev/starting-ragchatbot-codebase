@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton, themeToggle;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,8 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
     newChatButton = document.getElementById('newChatButton');
+    themeToggle = document.getElementById('themeToggle');
     
     setupEventListeners();
+    initializeTheme();
     createNewSession();
     loadCourseStats();
 });
@@ -32,6 +34,17 @@ function setupEventListeners() {
     
     // New chat button
     newChatButton.addEventListener('click', startNewChat);
+    
+    // Theme toggle button
+    themeToggle.addEventListener('click', toggleTheme);
+    
+    // Keyboard support for theme toggle
+    themeToggle.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleTheme();
+        }
+    });
     
     // Suggested questions
     document.querySelectorAll('.suggested-item').forEach(button => {
@@ -243,4 +256,52 @@ async function loadCourseStats() {
             courseTitles.innerHTML = '<span class="error">Failed to load courses</span>';
         }
     }
+}
+
+// Theme Management Functions
+function initializeTheme() {
+    // Check for saved theme preference or default to dark
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    
+    // Ensure body has the theme attribute for proper styling
+    document.body.setAttribute('data-theme', savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // Update theme attribute
+    document.documentElement.setAttribute('data-theme', newTheme);
+    document.body.setAttribute('data-theme', newTheme);
+    
+    // Save theme preference
+    localStorage.setItem('theme', newTheme);
+    
+    // Add a small animation feedback
+    themeToggle.style.transform = 'scale(0.9)';
+    setTimeout(() => {
+        themeToggle.style.transform = '';
+    }, 150);
+}
+
+// Optional: Add system theme detection
+function detectSystemTheme() {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        return 'light';
+    }
+    return 'dark';
+}
+
+// Listen for system theme changes
+if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+        // Only change theme if user hasn't set a preference
+        if (!localStorage.getItem('theme')) {
+            const newTheme = e.matches ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            document.body.setAttribute('data-theme', newTheme);
+        }
+    });
 }
